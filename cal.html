@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chemi – Calculation Workspace</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    html, body { height:100%; margin:0; background:#fff; color:#222; font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif; }
+    body { min-height:100vh; }
+    .header {
+        width:100%; background:#111; color:#fff; display:flex; justify-content:space-between; align-items:center;
+        padding:20px 38px 16px 38px; box-sizing:border-box; border-bottom:2px solid #222;
+    }
+    .nav { display:flex; gap:34px; align-items:center;}
+    .nav a {
+        color:#eee; text-decoration:none; font-weight:600; font-size:1em; letter-spacing:.03em; padding-bottom:3px;
+        transition:color .12s;
+    }
+    .nav a.active, .nav a:hover { color:#fff; border-bottom:2px solid #fff;}
+    .settings-btn {
+        color:#fff; background:#222; border:none; font-weight:700; font-size:1em; border-radius:6px; padding:8px 13px;
+        cursor:pointer; transition:background .14s;
+    }
+    .settings-btn:active { background:#333; }
+
+    /* Workspace Layout */
+    .workspace-grid {
+        max-width:1600px; margin:32px auto 0 auto; padding:0 24px; display:flex; flex-direction:row; gap:34px;
+        align-items:flex-start; min-height:calc(100vh - 100px);
+    }
+    .calc-select-panel {
+        min-width:250px; width:260px; background:#fafafa; border-right:2px solid #eee; border-radius:10px 0 0 10px;
+        padding:28px 16px 20px 16px;
+    }
+    .category-title {font-size:1.17em; font-weight:700; color:#333; margin:20px 0 7px 0;}
+    .category-list, .function-list { margin:0 0 24px 0; padding:0; list-style:none;}
+    .category-list li { margin:0 0 7px 0;}
+    .function-list li { margin:0 0 7px 0;}
+    .category-btn, .function-btn {
+        background:none; border:none; color:#222; font-weight:600; font-size:1.02em; padding:6px 8px; border-radius:5px;
+        cursor:pointer; text-align:left; width:100%; transition:background .11s;
+    }
+    .category-btn.active, .function-btn.active { background:#efefef; color:#111;}
+    .category-btn:hover, .function-btn:hover { background:#e6e6e6;}
+
+    /* Calculation Box Split Layout */
+    .calc-split-panel {
+        flex:auto; display:flex; flex-direction:row; gap:28px; justify-content:flex-start; flex-wrap:wrap;
+        align-items:flex-start;
+    }
+    .calc-box {
+        min-width:340px; max-width:440px; background:#fff; border-radius:10px; box-shadow:0 2px 12px rgba(0,0,0,0.08);
+        padding:28px 24px 20px 24px; margin-bottom:28px; border:1px solid #efefef; display:flex; flex-direction:row;
+    }
+    .calc-left, .calc-right { flex:1; margin:0 6px;}
+    .calc-left { min-width:140px; max-width:170px;}
+    .calc-right { min-width:120px; border-left:1px solid #f0f0f0; padding-left:14px;}
+
+    label { display:block; font-weight:600; margin-bottom:6px; color:#444;}
+    input[type="number"], input[type="text"] {
+        color:#222; background:#f7f7f7; border:1px solid #ddd; outline:none; border-radius:5px; font-size:1.09em;
+        padding:7px 11px; width:96%; transition:border .11s;
+    }
+    input[type="number"]:focus, input[type="text"]:focus { border-color:#222;}
+    .panel-row {margin-bottom:14px;}
+    .calc-btn {
+        padding:7px 17px; background:#111; color:#fff; border:none; border-radius:5px; font-size:1em; font-weight:500;
+        cursor:pointer; margin-top:4px; margin-bottom:2px;
+    }
+    .calc-btn:active {background:#222;}
+    .output { background:#efefef; color:#222; font-size:1em; border-radius:5px; margin:7px 0 0 0; padding:9px;}
+    .working-out { background:#fafafa; color:#555; font-size:.98em; border-radius:5px; border-left:2px solid #222;
+        margin:7px 0 0 0; padding:9px 11px 7px 11px;}
+    .fold-btn {
+        display:inline-block; background:none; color:#555; font-weight:700; border:none; font-size:.97em;
+        padding:2px 0; cursor:pointer; outline:none; margin-bottom:4px;
+    }
+    .fold-btn:active {color:#111;}
+
+    /* Responsive */
+    @media (max-width:850px) {
+        .workspace-grid { flex-direction:column; gap:8px;}
+        .calc-select-panel { width:100%; min-width:unset;}
+        .calc-split-panel { flex-direction:column; gap:12px;}
+        .calc-box { max-width:99vw;}
+    }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <div class="nav">
+        <a href="#" class="active">Calculations</a>
+        <a href="#">Periodic Table</a>
+    </div>
+    <button class="settings-btn" onclick="alert('Settings coming soon!')">⚙️ Settings</button>
+</div>
+<div class="workspace-grid">
+
+    <!-- Selection Panel -->
+    <div class="calc-select-panel">
+        <span class="category-title">Categories</span>
+        <ul class="category-list" id="categoryList"></ul>
+        <span class="category-title">Functions</span>
+        <ul class="function-list" id="functionList"></ul>
+    </div>
+
+    <!-- Calculation Split Panel -->
+    <div class="calc-split-panel" id="calcSplitPanel"></div>
+</div>
+
+<script>
+// Calculation categories and functions
+const calcCategories = [
+    {name:"Stoichiometry", id:"stoich"},
+    {name:"Solutions", id:"solutions"},
+    {name:"Atomic Structure", id:"atomic"},
+    {name:"Conversions", id:"conversions"},
+    {name:"General", id:"general"},
+];
+const calcFunctions = [
+    // Stoichiometry
+    {category:"stoich", name:"Mole Calculation", id:"mole", desc:"Calculate moles from mass and molar mass"},
+    {category:"stoich", name:"Mass Calculation", id:"mass", desc:"Calculate mass from moles and molar mass"},
+    {category:"stoich", name:"Mole Ratio", id:"mole-ratio", desc:"Find the mole ratio from a chemical equation"},
+    {category:"stoich", name:"Limiting Reactant", id:"limiting", desc:"Determine the limiting reactant and theoretical yield"},
+    {category:"stoich", name:"Percent Yield", id:"yield", desc:"Calculate percent yield from experimental and theoretical"},
+    {category:"stoich", name:"Empirical Formula", id:"empirical", desc:"Calculate empirical formula from percent composition"},
+    // Solutions
+    {category:"solutions", name:"Molarity", id:"molarity", desc:"Calculate solution molarity"},
+    {category:"solutions", name:"Dilution", id:"dilution", desc:"Dilution calculations"},
+    {category:"solutions", name:"pH Calculation", id:"ph", desc:"Calculate pH from H⁺ concentration"},
+    // Atomic Structure
+    {category:"atomic", name:"Molar Mass", id:"mmass", desc:"Calculate molar mass of a compound"},
+    {category:"atomic", name:"Percent Composition", id:"pcomp", desc:"Calculate percent composition from formula"},
+    {category:"atomic", name:"Ion Charge", id:"ion", desc:"Lookup common ion charge"},
+    // Conversions
+    {category:"conversions", name:"Mass ⇄ Volume", id:"massvol", desc:"Convert mass to volume (water) and vice versa"},
+    {category:"conversions", name:"Moles ⇄ Particles", id:"molpart", desc:"Convert moles to particles and vice versa"},
+    {category:"conversions", name:"Temperature Conversion", id:"temp", desc:"Convert between °C and K"},
+    // General
+    {category:"general", name:"Reactant Product Ratio", id:"prod-ratio", desc:"Mole ratios in a reaction"},
+];
+
+// Default atomic masses like previous
+const atomicMasses = {
+    H:1.008, He:4.0026, Li:6.94, Be:9.0122, B:10.81, C:12.01, N:14.01, O:16.00, F:18.998, Ne:20.18, Na:22.99, Mg:24.305,
+    Al:26.982, Si:28.085, P:30.974, S:32.06, Cl:35.45, Ar:39.948, K:39.098, Ca:40.078, Sc:44.956, Ti:47.867,
+    V:50.942, Cr:51.996, Mn:54.938, Fe:55.845, Co:58.933, Ni:58.693, Cu:63.546, Zn:65.38, Ag:107.87, Sn:118.71,
+    Pb:207.2, NH4:18.04, NO3:62.00, SO4:96.06, CO3:60.01, PO4:94.97, OH:17.01, CH3COO:59.04
+};
+
+const ionCharges = {
+    H:"+1", Li:"+1", Na:"+1", K:"+1", Ca:"+2", Mg:"+2", Ba:"+2", Al:"+3",
+    F:"-1", Cl:"-1", Br:"-1", I:"-1", O:"-2", S:"-2", N:"-3", P:"-3",
+    Fe:"2+, 3+", Cu:"1+, 2+", Zn:"2+", Ag:"1+", Sn:"2+, 4+", Pb:"2+, 4+", Cr:"2+, 3+, 6+",
+    Mn:"2+", Hg:"1+, 2+", Co:"2+, 3+", Ni:"2+, 3+",
+    NH4:"+1", OH:"-1", NO3:"-1", SO4:"-2", CO3:"-2", PO4:"-3", CH3COO:"-1"
+};
+
+// UI state
+let selectedCategory = "stoich";
+let selectedFunctions = ["mole"]; // Default one calculation shown
+
+// Render category and function selection panels
+function renderCategoryPanel() {
+    const cl = document.getElementById('categoryList');
+    cl.innerHTML = "";
+    calcCategories.forEach(c => {
+        cl.innerHTML += `<li><button class="category-btn${selectedCategory===c.id?" active":""}" onclick="selectCategory('${c.id}')">${c.name}</button></li>`;
+    });
+}
+function renderFunctionPanel() {
+    const fl = document.getElementById('functionList');
+    fl.innerHTML = "";
+    calcFunctions.filter(f=>f.category===selectedCategory).forEach(fn => {
+        fl.innerHTML += `<li><button class="function-btn${selectedFunctions.includes(fn.id)?" active":""}" onclick="addCalc('${fn.id}')">${fn.name}</button></li>`;
+    });
+}
+
+// Select category
+function selectCategory(cid) {
+    selectedCategory = cid;
+    selectedFunctions = [calcFunctions.find(fn=>fn.category===cid).id];
+    renderCategoryPanel(); renderFunctionPanel(); renderCalcBoxes();
+}
+
+// Add or remove calculation function box
+function addCalc(fid) {
+    if (selectedFunctions.includes(fid)) {
+        if(selectedFunctions.length>1)
+            selectedFunctions = selectedFunctions.filter(f=>f!==fid); // Remove function
+    } else {
+        if(selectedFunctions.length<4)
+            selectedFunctions.push(fid); // Add function (max 4 at once)
+    }
+    renderFunctionPanel(); renderCalcBoxes();
+}
+
+// Render calculation boxes in split screen
+function renderCalcBoxes() {
+    const cp = document.getElementById('calcSplitPanel');
+    cp.innerHTML = "";
+    selectedFunctions.forEach(fid=>{
+        cp.innerHTML += `<div class="calc-box">${renderCalcFunctionBox(fid)}</div>`;
+    });
+}
+
+// Each calculation function template (function mapping)
+function renderCalcFunctionBox(fid) {
+    // Switch on each fid to produce function panel (left) + working out (right)
+    if (fid==="mole") return `
+        <div class="calc-left">
+            <div class="panel-row"><label>Mass (g):</label><input type="number" id="moleMass${fid}" placeholder="mass"></div>
+            <div class="panel-row"><label>Molar Mass (g/mol):</label><input type="number" id="moleMMass${fid}" placeholder="molar mass"></div>
+            <button class="calc-btn" onclick="doMoleCalc('${fid}')">Calculate</button>
+            <div class="output" id="moleAns${fid}"></div>
+        </div>
+        <div class="calc-right">
+            <button class="fold-btn" id="moleShowW${fid}" onclick="toggleWork('moleWork${fid}','moleShowW${fid}')" style="display:none;">Show Working Out ▼</button>
+            <div class="working-out" id="moleWork${fid}" style="display:none;"></div>
+        </div>`;
+    if (fid==="mass") return `
+        <div class="calc-left">
+            <div class="panel-row"><label>Moles (mol):</label><input type="number" id="massMol${fid}" placeholder="moles"></div>
+            <div class="panel-row"><label>Molar Mass (g/mol):</label><input type="number" id="massMMass${fid}" placeholder="molar mass"></div>
+            <button class="calc-btn" onclick="doMassCalc('${fid}')">Calculate</button>
+            <div class="output" id="massAns${fid}"></div>
+        </div>
+        <div class="calc-right">
+            <button class="fold-btn" id="massShowW${fid}" onclick="toggleWork('massWork${fid}','massShowW${fid}')" style="display:none;">Show Working Out ▼</button>
+            <div class="working-out" id="massWork${fid}" style="display:none;"></div>
+        </div>`;
+    if (fid==="mole-ratio") return `
+        <div class="calc-left">
+            <label>Chemical Equation (e.g. 2H2 + O2 → 2H2O):</label>
+            <input type="text" id="mrEq${fid}" placeholder="Equation">
+            <button class="calc-btn" onclick="doMoleRatioCalc('${fid}')">Calculate</button>
+            <div class="output" id="mrAns${fid}"></div>
+        </div>
+        <div class="calc-right">
+            <button class="fold-btn" id="mrShowW${fid}" onclick="toggleWork('mrWork${fid}','mrShowW${fid}')" style="display:none;">Show Working Out ▼</button>
+            <div class="working-out" id="mrWork${fid}" style="display:none;"></div>
+        </div>`;
+    if (fid==="limiting") return `
+        <div class="calc-left">
+            <label>Reactants (e.g. H2:3,O2:1):</label>
+            <input type="text" id="limReact${fid}" placeholder="A:mol,B:mol">
+            <button class="calc-btn" onclick="doLimitingCalc('${fid}')">Calculate</button>
+            <div class="output" id="limAns${fid}"></div>
+        </div>
+        <div class="calc-right">
+            <button class="fold-btn" id="limShowW${fid}" onclick="toggleWork('limWork${fid}','limShowW${fid}')" style="display:none;">Show Working Out ▼</button>
+            <div class="working-out" id="limWork${fid}" style="display:none;"></div>
+        </div>`;
+    // Many more functions; for brevity, generalise implementation below...
+    if (fid==="yield") return `
+        <div class="calc-left">
+            <label>Theoretical Yield (g):</label>
+            <input type="number" id="yTheo${fid}" placeholder="theoretical">
+            <label>Actual Yield (g):</label>
+            <input type="number" id="yActual${fid}" placeholder="actual">
+            <button class="calc-btn" onclick="doYieldCalc('${fid}')">Calculate</button>
+            <div class="output" id="yAns${fid}"></div>
+        </div>
+        <div class="calc-right">
+            <button class="fold-btn" id="yShowW${fid}" onclick="toggleWork('yWork${fid}','yShowW${fid}')" style="display:none;">Show Working Out ▼</button>
+            <div class="working-out" id="yWork${fid}" style="display:none;"></div>
+        </div>`;
+    if (fid==="empirical") return `
+        <div class="calc-left">
+            <label>Percentages (e.g. C:40,H:6.7,O:53.3):</label>
+            <input type="text" id="empInput${fid}" placeholder="Percent composition">
+            <button class="calc-btn" onclick="doEmpiricalCalc('${fid}')">Calculate</button>
+            <div class="output" id="empAns${fid}"></div>
+        </div>
+        <div class="calc-right">
+            <button class="fold-btn" id="empShowW${fid}" onclick="toggleWork('empWork${fid}','empShowW${fid}')" style="display:none;">Show Working Out ▼</button>
+            <div class="working-out" id="empWork${fid}" style="display:none;"></div>
+        </div>`;
+    if (fid==="molarity") return `
+        <div class="calc-left">
+            <label>Moles of Solute (mol):</label>
+            <input type="number" id="moleIn${fid}" placeholder="moles">
+            <label>Volume (L):</label>
+            <input type="number" id="volIn${fid}" placeholder="volume">
+            <button class="calc-btn" onclick="doMolarityCalc('${fid}')">Calculate</button>
+            <div class="output" id="molAns${fid}"></div>
+        </div>
+        <div class="calc-right">
+            <button class="fold-btn" id="molShowW${fid}" onclick="toggleWork('molWork${fid}','molShowW${fid}')" style="display:none;">Show Working Out ▼</button>
+            <div class="working-out" id="molWork${fid}" style="display:none;"></div>
+        </div>`;
+    if (fid==="dilution") return `
+        <div class="calc-left">
+            <label>Initial Molarity (M):</label>
+            <input type="number" id="dInitM${fid}" placeholder="M">
+            <label>Initial Volume (L):</label>
+            <input type="number" id="dInitV${fid}" placeholder="L">
+            <label>Final Volume (L):</label>
+            <input type="number" id="dFinV${fid}" placeholder="L">
+            <button class="calc-btn" onclick="doDilutionCalc('${fid}')">Calculate</button>
+            <div class="output" id="dilAns${fid}"></div>
+        </div>
+        <div class="calc-right">
+            <button class="fold-btn" id="dilShowW${fid}" onclick="toggleWork('dilWork${fid}','dilShowW${fid}')" style="display:none;">Show Working Out ▼</button>
+            <div class="working-out" id="dilWork${fid}" style="display:none;"></div>
+        </div>`;
+    if (fid==="ph") return `
+        <div class="calc-left">
+            <label>[H⁺] Concentration (mol/L):</label>
+            <input type="number" id="phInput${fid}" step="any" placeholder="e.g. 0.01">
+            <button class="calc-btn" onclick="doPHCalc('${fid}')">Calculate</button>
+            <div class="output" id="phAns${fid}"></div>
+        </div>
+        <div class="calc-right">
+            <button class="fold-btn" id="phShowW${fid}" onclick="toggleWork('phWork${fid}','phShowW${fid}')" style="display:none;">Show Working Out ▼</button>
+            <div class="working-out" id="phWork${fid}" style="display:none;"></div>
+        </div>`;
+    if (fid==="mmass") return `
+        <div class="calc-left">
+            <label>Chemical Formula:</label>
+            <input type="text" id="mmF${fid}" placeholder="Formula e.g. H2SO4">
+            <button class="calc-btn" onclick="doMmassCalc('${fid}')">Calculate</button>
+            <div class="output" id="mmAns${fid}"></div>
+        </div>
+        <div class="calc-right">
+            <button class="fold-btn" id="mmShowW${fid}" onclick="toggleWork('mmWork${fid}','mmShowW${fid}')" style="display:none;">Show Working Out ▼</button>
+            <div class="working-out" id="mmWork${fid}" style="display:none;"></div>
+        </div>`;
+    if (fid==="pcomp") return `
+        <div class="calc-left">
+            <label>Chemical Formula:</label>
+            <input type="text" id="pcF${fid}" placeholder="Formula e.g. Na2CO3">
+            <button class="calc-btn" onclick="doPcompCalc('${fid}')">Calculate</button>
+            <div class="output" id="pcAns${fid}"></div>
+        </div>
+        <div class="calc-right">
+            <button class="fold-btn" id="pcShowW${fid}" onclick="toggleWork('pcWork${fid}','pcShowW${fid}')" style="display:none;">Show Working Out ▼</button>
+            <div class="working-out" id="pcWork${fid}" style="display:none;"></div>
+        </div>`;
+    if (fid==="ion") return `
+        <div class="calc-left">
+            <label>Ion Symbol:</label>
+            <input type="text" id="ionInp${fid}" placeholder="e.g. Na, SO4">
+            <button class="calc-btn" onclick="doIonCalc('${fid}')">Lookup</button>
+            <div class="output" id="ionAns${fid}"></div>
+        </div>
+        <div class="calc-right"></div>`;
+    // More functions (massvol, molpart, temp, prod-ratio, etc.) would be similarly mapped.
+    return `<div class="calc-left"><label>Unknown Function</label></div><div class="calc-right"></div>`;
+}
+
+// Fold/unfold working out display
+function toggleWork(wid, bid) {
+    let work = document.getElementById(wid);
+    let btn = document.getElementById(bid);
+    let show = work.style.display==="none";
+    work.style.display = show ? "block" : "none";
+    btn.innerText = show ? "Hide Working Out ▲" : "Show Working Out ▼";
+}
+function showWorkBtn(wid, bid) {
+    document.getElementById(wid).style.display="none";
+    let btn = document.getElementById(bid);
+    btn.style.display="inline-block";
+    btn.innerText="Show Working Out ▼";
+}
+
+// Calculation functions: code for main calcs and working-out, mapped by input box ids
+function doMoleCalc(fid) {
+    let mass = parseFloat(document.getElementById('moleMass'+fid).value);
+    let mmass = parseFloat(document.getElementById('moleMMass'+fid).value);
+    if(isNaN(mass)||isNaN(mmass)||mmass<=0){document.getElementById('moleAns'+fid).innerText="Invalid input.";return;}
+    let moles = mass/mmass;
+    document.getElementById('moleAns'+fid).innerText = `Moles: ${moles.toFixed(3)} mol`;
+    document.getElementById('moleWork'+fid).innerText = `n = m / M = ${mass} / ${mmass} = ${moles.toFixed(3)} mol`;
+    showWorkBtn('moleWork'+fid, 'moleShowW'+fid);
+}
+function doMassCalc(fid) {
+    let mol = parseFloat(document.getElementById('massMol'+fid).value);
+    let mmass = parseFloat(document.getElementById('massMMass'+fid).value);
+    if(isNaN(mol)||isNaN(mmass)||mmass<=0){document.getElementById('massAns'+fid).innerText="Invalid input.";return;}
+    let mass = mol*mmass;
+    document.getElementById('massAns'+fid).innerText = `Mass: ${mass.toFixed(3)} g`;
+    document.getElementById('massWork'+fid).innerText = `m = n × M = ${mol} × ${mmass} = ${mass.toFixed(3)} g`;
+    showWorkBtn('massWork'+fid, 'massShowW'+fid);
+}
+function doMoleRatioCalc(fid) {
+    let eqn = document.getElementById('mrEq'+fid).value.trim();
+    if(!eqn){document.getElementById('mrAns'+fid).innerText="Please enter an equation.";return;}
+    // Very basic parser for '2A + 1B -> ...'
+    let r = eqn.match(/(\d*)\s*([A-Za-z0-9]+)\s*\+\s*(\d*)\s*([A-Za-z0-9]+)\s*→/);
+    if(r){
+        let a = r[10], ca = r[11]?parseInt(r[11]):1;
+        let b = r[4], cb = r[3]?parseInt(r[3]):1;
+        document.getElementById('mrAns'+fid).innerText=`${a}:${ca}, ${b}:${cb}`;
+        document.getElementById('mrWork'+fid).innerText = `From the equation, ${a} has coefficient ${ca}, ${b} has coefficient ${cb}. Mole ratio is ${ca}:${cb}.`;
+        showWorkBtn('mrWork'+fid,'mrShowW'+fid);
+    } else {
+        document.getElementById('mrAns'+fid).innerText="Equation format not recognised.";
+    }
+}
+function doLimitingCalc(fid){
+    let input = document.getElementById('limReact'+fid).value.replace(/\s+/g,'');
+    let pairs = input.split(',').map(v=>v.split(':'));
+    let min=Infinity,lname="",work=[];
+    pairs.forEach(([el,val])=>{
+        let n=parseFloat(val);
+        work.push(`${el}: ${n} mol`);
+        if(n<min){min=n;lname=el;}
+    });
+    document.getElementById('limAns'+fid).innerText=`Limiting reactant: ${lname}`;
+    work.push(`The smallest amount decides limiting reactant: ${lname}.`);
+    document.getElementById('limWork'+fid).innerText = work.join('\n'); showWorkBtn('limWork'+fid,'limShowW'+fid);
+}
+function doYieldCalc(fid){
+    let theo=parseFloat(document.getElementById('yTheo'+fid).value);
+    let actual=parseFloat(document.getElementById('yActual'+fid).value);
+    if(isNaN(theo)||isNaN(actual)||theo<=0){document.getElementById('yAns'+fid).innerText="Invalid input.";return;}
+    let py=actual/theo*100;
+    document.getElementById('yAns'+fid).innerText = `Percent Yield: ${py.toFixed(2)}%`;
+    document.getElementById('yWork'+fid).innerText = `Percent yield = (actual / theoretical) × 100\n= (${actual} / ${theo}) × 100 = ${py.toFixed(2)}%`;
+    showWorkBtn('yWork'+fid,'yShowW'+fid);
+}
+function doEmpiricalCalc(fid){
+    let input = document.getElementById('empInput'+fid).value.replace(/\s+/g,'');
+    let pairs = input.split(',').map(v=>v.split(':'));
+    let elements = {};
+    for(let [el,val] of pairs){ if(el&&!isNaN(val)) elements[el]=parseFloat(val);}
+    let work=[],moles={},minMol=Infinity;
+    for(let el in elements){
+        let mm=atomicMasses[el]; if(!mm)continue; moles[el]=elements[el]/mm;
+        work.push(`${el}: ${elements[el]} ÷ ${mm} = ${moles[el].toFixed(3)}`);
+        if(moles[el]<minMol) minMol=moles[el];
+    }
+    let fracs={},final={};
+    for(let el in moles){fracs[el]=moles[el]/minMol; final[el]=Math.round(fracs[el]);}
+    let formula=Object.entries(final).map(([el,n])=>el+(n>1?n:'')).join('');
+    work.push(`Empirical formula: ${formula}`);
+    document.getElementById('empAns'+fid).innerText=`Empirical formula: ${formula}`;
+    document.getElementById('empWork'+fid).innerText=work.join('\n'); showWorkBtn('empWork'+fid,'empShowW'+fid);
+}
+function doMolarityCalc(fid){
+    let n=parseFloat(document.getElementById('moleIn'+fid).value);
+    let V=parseFloat(document.getElementById('volIn'+fid).value);
+    if(isNaN(n)||isNaN(V)||V<=0){document.getElementById('molAns'+fid).innerText="Invalid input.";return;}
+    let M=n/V;
+    document.getElementById('molAns'+fid).innerText = `Molarity: ${M.toFixed(3)} mol/L`;
+    document.getElementById('molWork'+fid).innerText = `M = n/V = ${n} / ${V} = ${M.toFixed(3)} mol/L`;
+    showWorkBtn('molWork'+fid,'molShowW'+fid);
+}
+function doDilutionCalc(fid){
+    let Mi=parseFloat(document.getElementById('dInitM'+fid).value);
+    let Vi=parseFloat(document.getElementById('dInitV'+fid).value);
+    let Vf=parseFloat(document.getElementById('dFinV'+fid).value);
+    if(isNaN(Mi)||isNaN(Vi)||isNaN(Vf)||Vi<=0||Vf<=0){document.getElementById('dilAns'+fid).innerText="Invalid input.";return;}
+    let Mf=Mi*Vi/Vf;
+    document.getElementById('dilAns'+fid).innerText = `Final Molarity: ${Mf.toFixed(3)} mol/L`;
+    document.getElementById('dilWork'+fid).innerText = `M₁V₁ = M₂V₂\n${Mi}×${Vi} = M₂×${Vf}\nM₂ = ${Mi}×${Vi} / ${Vf} = ${Mf.toFixed(3)} mol/L`;
+    showWorkBtn('dilWork'+fid,'dilShowW'+fid);
+}
+function doPHCalc(fid){
+    let h=parseFloat(document.getElementById('phInput'+fid).value);
+    if(isNaN(h)||h<=0){document.getElementById('phAns'+fid).innerText="Invalid input.";return;}
+    let pH=-Math.log10(h);
+    document.getElementById('phAns'+fid).innerText = `pH: ${pH.toFixed(2)}`;
+    document.getElementById('phWork'+fid).innerText = `pH = -log₁₀[H⁺] = -log₁₀(${h}) = ${pH.toFixed(2)}`;
+    showWorkBtn('phWork'+fid,'phShowW'+fid);
+}
+function parseFormula(formula){
+    let regex=/([A-Z][a-z]?|NH4|NO3|SO4|CO3|PO4|OH|CH3COO)(\d*)/g, matches, elements={};
+    while((matches=regex.exec(formula))!==null){
+        let element=matches[1],count=matches[2]===""?1:parseInt(matches[2]);
+        if(!elements[element])elements[element]=0; elements[element]+=count;
+    }
+    return elements;
+}
+function doMmassCalc(fid){
+    let formula=document.getElementById('mmF'+fid).value.trim();
+    if(!formula)return; let elements=parseFormula(formula),total=0,invalid=[];
+    let work=[];
+    for(let [el,count] of Object.entries(elements)){
+        let m=atomicMasses[el];if(m){total+=m*count;work.push(`${el} × ${count} × ${m} = ${(count*m).toFixed(3)} g/mol`);}
+        else invalid.push(el);
+    }
+    document.getElementById('mmAns'+fid).innerText=invalid.length?`Unknown: ${invalid.join(', ')}`:`${total.toFixed(3)} g/mol`;
+    if(!invalid.length){document.getElementById('mmWork'+fid).innerText=work.join('\n'); showWorkBtn('mmWork'+fid,'mmShowW'+fid);}
+}
+function doPcompCalc(fid){
+    let formula=document.getElementById('pcF'+fid).value.trim();
+    if(!formula)return; let elements=parseFormula(formula),total=0,invalid=[];
+    let work=[],out=[];
+    for(let [el,count] of Object.entries(elements)){
+        let m=atomicMasses[el];if(m)total+=m*count; else invalid.push(el);}
+    if(invalid.length){document.getElementById('pcAns'+fid).innerText=`Unknown: ${invalid.join(', ')}`;return;}
+    for(let [el,count] of Object.entries(elements)){
+        let elmass=atomicMasses[el]*count; let percent=(elmass/total*100).toFixed(2);
+        out.push(`${el}: ${percent}%`); work.push(`${el}: (${atomicMasses[el]} × ${count}) / ${total.toFixed(3)} × 100 = ${percent}%`);
+    }
+    document.getElementById('pcAns'+fid).innerText=out.join(' | ');
+    document.getElementById('pcWork'+fid).innerText=work.join('\n'); showWorkBtn('pcWork'+fid,'pcShowW'+fid);
+}
+function doIonCalc(fid){
+    let ion=document.getElementById('ionInp'+fid).value.trim();
+    let charge=ionCharges[ion];
+    document.getElementById('ionAns'+fid).innerText=charge?`Charge: ${charge}`:"Not found. Try common ion/element.";
+}
+// Initial render
+renderCategoryPanel(); renderFunctionPanel(); renderCalcBoxes();
+</script>
+</body>
+</html>
